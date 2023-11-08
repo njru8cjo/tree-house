@@ -21,7 +21,7 @@ class Tree_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def Tree_CustomType : Tree_Type<"Custom", "custom"> {
+def Tree_node : Tree_Type<"Node", "node"> {
     let summary = "Tree custom type";
     let description = "Custom type in tree dialect";
     let parameters = (ins StringRefParameter<"the custom value">:$value);
