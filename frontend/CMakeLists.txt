@@ -1,15 +1,5 @@
-get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-set(LIBS
-        ${dialect_libs}
-        ${conversion_libs}
-        MLIRArithDialect
-        MLIROptLib
-        MLIRTree
-        )
-add_llvm_executable(frontend frontend.cpp)
+project(frontend)
 
-llvm_update_compile_flags(frontend)
-target_link_libraries(frontend PRIVATE ${LIBS})
-
-mlir_check_all_link_libraries(frontend)
+include_directories(${PROJECT_SOURCE_DIR})
+add_executable(${PROJECT_NAME} main.cpp)
+target_link_libraries(${PROJECT_NAME})
