@@ -24,9 +24,6 @@ private:
 
 void SklearnParser::constructForest()
 {
-    int64_t id = 0;    
-
-    int32_t treeIndex = 0;
     for (auto& treeJSON : m_json)
     {
         m_decisionTree = &(m_forest->newTree());
@@ -65,12 +62,12 @@ void SklearnParser::constructTree(const json treeJSON)
         }
 
         int64_t parentId = currentNode.parent;
-    
+
         m_decisionTree->SetNodeParent(id, parentId);
 
         if(currentNode.isLeft && parentId != DecisionTree::ROOT_NODE_PARENT) {
             m_decisionTree->SetNodeLeftChild(parentId, id);
-        } else {
+        } else if(parentId != DecisionTree::ROOT_NODE_PARENT) {
             m_decisionTree->SetNodeRightChild(parentId, id);
         }
        

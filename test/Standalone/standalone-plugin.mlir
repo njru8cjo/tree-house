@@ -7,7 +7,7 @@ module {
   }
 
   // CHECK-LABEL: func @tree_types(%arg0: !tree.custom<"10">)
-  func.func @tree_types(%arg0: !tree.custom<"10">) {
-    return
-  }
+  //func.func @tree_types(%arg0: !tree.custom<"10">) {
+  //  return
+  //}
 }

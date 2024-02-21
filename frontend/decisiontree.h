@@ -52,6 +52,8 @@ public:
     void SetNodeRightChild(int64_t node, int64_t child) { m_nodes[node].rightChild = child; }
     void SetNodeLeftChild(int64_t node, int64_t child) { m_nodes[node].leftChild = child; }
 
+    Node getNode(int64_t idx) { return m_nodes[idx]; }
+
     void print();
 
 private:
@@ -69,9 +71,14 @@ public:
     }
     
     void print();
+    void setFeatureSize(int64_t size) { featureSize = size; }
+    int64_t getFeatureSize() { return featureSize; }
+    size_t getTreeSize() { return m_trees.size(); }
+    DecisionTree* getTree(size_t i) { return m_trees[i].get(); }
 
 private:
     std::vector<std::shared_ptr<DecisionTree>> m_trees;
+    int64_t featureSize = 0;
 };
 
 
@@ -80,14 +87,19 @@ void DecisionTree::print() {
     std::cout << "nodes number =" << m_nodes.size() << "\n";
 
     for (Node node : m_nodes) {
-        std::cout << "node " << node.id << " parent:" << node.parent << " leftchild:" << node.leftChild  << " rightchild:" << node.rightChild 
-        << " split=" << node.threshold << " feature=" << node.featureIndex << " probability=" << node.probability << " " << std::endl;
+        if(node.leftChild == EMPTY_NODE_INDEX) {
+            std::cout << "node " << node.id << " parent:" << node.parent << " leftchild:" << node.leftChild  << " rightchild:" << node.rightChild 
+            << " split=" << node.threshold << " feature=" << node.featureIndex << " probability=" << node.probability << " " << std::endl;
+       
+        }
     }
     std::cout << "===================\n";    
 }
 
 
-void DecisionForest::print() {        
+void DecisionForest::print() {  
+
+    std::cout << "featureSize: " << featureSize << std::endl;      
     for(auto& tree: m_trees) {
         tree->print();
     }

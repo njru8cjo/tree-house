@@ -27,6 +27,10 @@ public:
 
     virtual void print();
     virtual void constructForest() = 0;
+
+    DecisionForest* getDecisionForest() const {
+        return m_forest;
+    }
 };
 
 void JsonParser::print() {

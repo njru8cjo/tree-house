@@ -15,26 +15,23 @@ public:
 void XGBoostParser::constructForest()
 {
     auto& learnerJSON = m_json["learner"];
+
+    auto& featureTypesJSON = learnerJSON["feature_types"];
+    m_forest->setFeatureSize(featureTypesJSON.size());
+
     auto& boosterJSON = learnerJSON["gradient_booster"];
     auto& modelJSON = boosterJSON["model"];
     auto& treesJSON = modelJSON["trees"];
-    int i = 1;
 
     for (auto& treeJSON : treesJSON)
     {
-        std::cout<<"Tree " << i++ << "\n";
         m_decisionTree = &(m_forest->newTree());
         constructTree(treeJSON);
     }
 }
 
 void XGBoostParser::constructTree(const json treeJSON) {
-      // TODO what is "base_weights", "categories", "categories_nodes", 
-    // "categories_segments", "categories_sizes"?
-    size_t numNodes = treeJSON["base_weights"].size();
-    // TODO ignoring "default_left"
-    // auto treeID = treeJSON["id"].get<int>();
-    
+ 
     auto& left_children = treeJSON["left_children"];
     auto& right_childen = treeJSON["right_children"];
     auto& parents = treeJSON["parents"];
@@ -46,8 +43,6 @@ void XGBoostParser::constructTree(const json treeJSON) {
 
     for (size_t i=0 ; i< num_nodes ; ++i)
     {
-        // assert (split_type[i].get<int>() == 0); // only numerical splits for now
-        // auto node = this->NewNode(split_conditions[i].get<ThresholdType>(), split_indices[i].get<FeatureIndexType>()); // @@Java
         int64_t nodeId = m_decisionTree->NewNode(thresholds[i].get<double>(), featureIndices[i].get<int64_t>(), 1.0);
         nodeIds.push_back(nodeId);
     }

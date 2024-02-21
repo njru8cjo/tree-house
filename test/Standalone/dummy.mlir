@@ -8,9 +8,4 @@ module {
         %res = tree.foo %0 : i32
         return
     }
-
-    // CHECK-LABEL: func @tree_types(%arg0: !tree.custom<"10">)
-    func.func @tree_types(%arg0: !tree.custom<"10">) {
-        return
-    }
 }

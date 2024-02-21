@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   
   auto insertPoint = builder.saveInsertionPoint();
   
-  auto &entryBlock = *func.addEntryBlock(); a[2]
+  auto &entryBlock = *func.addEntryBlock();
   builder.setInsertionPointToStart(&entryBlock);
 
   // Constants
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   m_module->dump();
 
   // Transfer to LLVM dialect
-  mlir::PassManager pm(&context);
+  // mlir::PassManager pm(&context);
   mlir::ConversionTarget target(context);
 
 
@@ -131,10 +131,10 @@ int main(int argc, char **argv) {
     
   // Setup target to LLVM Dialect
   target.addLegalDialect<mlir::LLVM::LLVMDialect>();
-  target.addIllegalDialect<mlir::arith::ArithDialect, mlir::func::FuncDialect, mlir::memref::MemRefDialect, mlir::scf::SCFDialect>();
+  target.addIllegalDialect<mlir::arith::ArithDialect, mlir::func::FuncDialect>();
   
   // Add conversion passes
-  populateSCFToControlFlowConversionPatterns(patterns);
+  // populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
