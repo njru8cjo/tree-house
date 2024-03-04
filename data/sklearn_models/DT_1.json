@@ -4,7 +4,7 @@
         "numSamples": 15412,
         "probLeft": 0.9455618998183234,
         "probRight": 0.054438100181676614,
-        "isCategorical": false,
+        "isCategorical": "False",
         "feature": 20,
         "split": 0,
         "leftChild": {

@@ -6,6 +6,7 @@ set(LIBS
         MLIRArithDialect
         MLIROptLib
         MLIRTree
+        MLIRExecutionEngine
         )
 
 add_llvm_executable(frontend main.cpp)

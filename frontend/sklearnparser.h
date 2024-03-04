@@ -5,7 +5,7 @@ using json = nlohmann::json;
 
 class SklearnParser : public JsonParser {
 public:
-    SklearnParser(const std::string& treeJSON) : JsonParser(treeJSON) {}
+    SklearnParser(const std::string& forestJSONPath) : JsonParser(forestJSONPath) {}
 
     ~SklearnParser() {}
 
@@ -48,8 +48,7 @@ void SklearnParser::constructTree(const json treeJSON)
             double threshold = currentNode.node["split"].get<double>();
             double probLeft = treeJSON["probLeft"].get<double>();
             double probRight = treeJSON["probRight"].get<double>();
-
-            id = m_decisionTree->NewNode(threshold, featureIndex, currentNode.prob);
+            id = m_decisionTree->newNode(threshold, featureIndex, currentNode.prob);
 
             nodeQueue.push({currentNode.node["leftChild"], id, probLeft * currentNode.prob, true});
             nodeQueue.push({currentNode.node["rightChild"], id, probRight * currentNode.prob, false});
@@ -58,17 +57,17 @@ void SklearnParser::constructTree(const json treeJSON)
             auto maxIt = std::max_element(vec.begin(), vec.end());
             double prediction = std::distance(vec.begin(), maxIt);
             
-            id = m_decisionTree->NewNode(prediction, DecisionTree::LEAF_NODE_FEATURE, currentNode.prob);            
+            id = m_decisionTree->newNode(prediction, DecisionTree::LEAF_NODE_FEATURE, currentNode.prob);            
         }
 
         int64_t parentId = currentNode.parent;
 
-        m_decisionTree->SetNodeParent(id, parentId);
+        m_decisionTree->setNodeParent(id, parentId);
 
         if(currentNode.isLeft && parentId != DecisionTree::ROOT_NODE_PARENT) {
-            m_decisionTree->SetNodeLeftChild(parentId, id);
+            m_decisionTree->setNodeLeftChild(parentId, id);
         } else if(parentId != DecisionTree::ROOT_NODE_PARENT) {
-            m_decisionTree->SetNodeRightChild(parentId, id);
+            m_decisionTree->setNodeRightChild(parentId, id);
         }
        
 
