@@ -6,9 +6,10 @@ set(LIBS
         MLIRArithDialect
         MLIROptLib
         MLIRTree
+        MLIRExecutionEngine
         )
-add_llvm_executable(frontend frontend.cpp)
 
+add_llvm_executable(frontend main.cpp)
 llvm_update_compile_flags(frontend)
 target_link_libraries(frontend PRIVATE ${LIBS})
 
