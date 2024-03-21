@@ -1,17 +1,37 @@
+
+#include <string>
 #include "test/maintest.h"
-//#include "test/correctnesstest.h"
 
 using namespace Treehierarchy;
 
-int main()
+bool RunXGBoostBenchmarksIfNeeded(int argc, char *argv[]) {
+    for (int32_t i = 0; i < argc; i++)
+        if (std::string(argv[i]).find(std::string("--xgboostBench")) != std::string::npos) {
+            test::RunXGBoostNonOptimizeTests();
+            test::RunXGBoostSwapOptimizeTests();
+            test::RunXGBoostFlintOptimizeTests();
+            return true;
+        }
+    return false;
+}
+
+bool RunCorrectnessTestIfNeeded(int argc, char *argv[]) {
+    for (int32_t i = 0; i < argc; i++)
+        if (std::string(argv[i]).find(std::string("--correctness")) != std::string::npos) {
+            test::RunXGBoostCorrectnessTests();
+            return true;
+        }
+    return false;
+}
+
+int main(int argc, char *argv[])
 {
-    // test::RunXGBoostNonOptimizeTests();
-    //test::RunXGBoostSwapOptimizeTests();
-    // test::RunXGBoostFlintOptimizeTests();
-    test::RunXGBoostCorrectnessTests();
+    if (RunCorrectnessTestIfNeeded(argc, argv))
+        return 0;
+    else if (RunXGBoostBenchmarksIfNeeded(argc, argv))
+        return 0;
 
-
-    return 0;
+    return -1;
 }
 
 // void dumpLLVMIRToFile(mlir::ModuleOp module)

@@ -7,7 +7,6 @@ namespace Treehierarchy
         void RunXGBoostNonOptimizeTests();
         void RunXGBoostSwapOptimizeTests();
         void RunXGBoostFlintOptimizeTests();
-
         void RunXGBoostCorrectnessTests();
 
     }

@@ -21,12 +21,14 @@ namespace Treehierarchy
             llvm::Expected<std::unique_ptr<mlir::ExecutionEngine>> m_maybeEngine;
             std::unique_ptr<mlir::ExecutionEngine> &m_engine;
             mlir::ModuleOp m_module;
+            void *m_inferenceFuncPtr;
 
             llvm::Expected<std::unique_ptr<mlir::ExecutionEngine>> CreateExecutionEngine(mlir::ModuleOp module);
+            void* GetFunctionAddress(const std::string& functionName);
 
         public:
             ModuleRunner(mlir::ModuleOp module);
-            float runInference(float *input);
+            void runInference(float *input, float *result);
         };
     }
 }

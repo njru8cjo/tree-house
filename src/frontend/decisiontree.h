@@ -62,11 +62,14 @@ namespace Treehierarchy
         void SetNodeRightChild(int64_t idx, int64_t child) { m_nodes[idx].rightChild = child; }
         void SetNodeLeftChild(int64_t idx, int64_t child) { m_nodes[idx].leftChild = child; }
         void SetProbability(int64_t idx, double prob) { m_nodes[idx].probability = prob; }
+        void SetClassId(size_t classId) { m_classId = classId; }
 
         Node GetNode(int64_t idx) { return m_nodes[idx]; }
+        size_t GetClassId() { return m_classId; }
         const std::vector<Node> &GetNodes() { return m_nodes; }
 
     private:
+        size_t m_classId = 0;
         std::vector<Node> m_nodes;
     };
 

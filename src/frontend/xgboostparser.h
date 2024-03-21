@@ -38,6 +38,7 @@ namespace Treehierarchy
         m_forest->SetObjective(objective);
 
         auto classNum = std::stoi(learnerJSON["learner_model_param"]["num_class"].get<std::string>());
+        classNum = classNum == 0 ? 1 : classNum;
         m_forest->SetClassNum(classNum);
 
         auto baseScore = std::stod(learnerJSON["learner_model_param"]["base_score"].get<std::string>());
@@ -45,12 +46,15 @@ namespace Treehierarchy
 
         auto &boosterJSON = learnerJSON["gradient_booster"];
         auto &modelJSON = boosterJSON["model"];
+        auto &treeInfoJSON = modelJSON["tree_info"];
         auto &treesJSON = modelJSON["trees"];
 
+        int32_t treeIndex = 0;
         for (auto &treeJSON : treesJSON)
         {
             m_decisionTree = &(m_forest->newTree());
             ConstructTree(treeJSON);
+            m_decisionTree->SetClassId(treeInfoJSON[treeIndex++]);
         }
 
         if (m_statFilePath != "")
@@ -158,31 +162,48 @@ namespace Treehierarchy
 
     void XGBoostParser::CreatePredictFunction()
     {
-        func::FuncOp mainFun(getFunctionPrototype("predict"));
+        Location loc = m_builder.getUnknownLoc();
+
+        Type argType = getFeaturePointerType();
+        auto functionType = m_builder.getFunctionType({argType, argType}, getF32());
+        auto mainFun = m_builder.create<func::FuncOp>(loc, "predict", functionType);
+        mainFun.setPublic();
+
         Block *callerBlock = mainFun.addEntryBlock();
         m_builder.setInsertionPointToStart(callerBlock);
 
-        Location loc = m_builder.getUnknownLoc();
-        Value result = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
+        Value input = callerBlock->getArgument(1);
+        Value result[m_forest->GetClassNum()];
+        for (size_t i = 0; i < m_forest->GetClassNum(); i++)
+        {
+            result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
+        }
 
         for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
         {
             auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));
-            result = m_builder.create<arith::AddFOp>(loc, result, callResult.getResult(0));
+            auto classId = m_forest->GetTree(i)->GetClassId();
+            result[classId] = m_builder.create<arith::AddFOp>(loc, result[classId], callResult.getResult(0));
         }
 
-        if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
+        for (size_t i = 0; i < m_forest->GetClassNum(); i++)
         {
-            auto negate = m_builder.create<arith::NegFOp>(loc, getF32(), result);
-            auto exponential = m_builder.create<math::ExpOp>(loc, getF32(), static_cast<Value>(negate));
 
-            auto oneConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr((float)1.0));
+            if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
+            {
+                auto negate = m_builder.create<arith::NegFOp>(loc, getF32(), result[i]);
+                auto exponential = m_builder.create<math::ExpOp>(loc, getF32(), static_cast<Value>(negate));
+                auto oneConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr((float)1.0));
+                auto onePlusExp = m_builder.create<arith::AddFOp>(loc, getF32(), oneConst, exponential);
+                result[i] = m_builder.create<arith::DivFOp>(loc, getF32(), oneConst, onePlusExp);
+            }
 
-            auto onePlusExp = m_builder.create<arith::AddFOp>(loc, getF32(), oneConst, exponential);
-            result = m_builder.create<arith::DivFOp>(loc, getF32(), oneConst, onePlusExp);
+            Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
+            Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+            m_builder.create<LLVM::StoreOp>(loc, result[i], resultPtr);
         }
 
-        m_builder.create<func::ReturnOp>(loc, result);
+        m_builder.create<func::ReturnOp>(loc, result[0]);
         m_module.push_back(mainFun);
     }
 }
