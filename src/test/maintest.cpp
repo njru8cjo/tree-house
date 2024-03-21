@@ -1,6 +1,7 @@
 #include <iostream>
-#include <unistd.h>
 #include <libgen.h>
+#include <limits>
+#include <unistd.h>
 
 #include "sklearnparser.h"
 #include "xgboostparser.h"
@@ -12,18 +13,22 @@ namespace Treehierarchy
 {
     namespace test
     {
-        inline bool FPEqual(float a, float b) {
-            const float scaledThreshold = std::max(std::fabs(a), std::fabs(b))/1e8;
-            const float threshold = std::max(float(1e-6), scaledThreshold);
-            auto sqDiff = (a-b) * (a-b);
-            bool ret = sqDiff < threshold;
-            if (!ret)
+        inline bool FPEqual(float a, float b, float epsilon)
+        {
+            bool ret = std::abs(a - b) < epsilon;
+
+            if (!ret) {
                 std::cout << a << " != " << b << std::endl;
+                std::cout << (a - b) << std::endl;
+                std::cout << "x in hex: " << std::hexfloat << a << std::endl;
+                std::cout << "y in hex: " << std::hexfloat << b << std::endl;
+            }
+
             return ret;
         }
 
         const std::string modelNames[] = {"abalone", "airline", "airline-ohe", "covtype", "epsilon", "letters", "higgs", "year_prediction_msd"};
-        const int32_t NUM_RUNS = 20;
+        const int32_t NUM_RUNS = 500;
 
         static std::string GetRepoPath()
         {
@@ -44,6 +49,7 @@ namespace Treehierarchy
             ModuleOp module = parser.buildHIRModule();
             module = parser.lowerToLLVMModule();
 
+            // module->dump();
 
             Execute::ModuleRunner runner(module);
 
@@ -57,13 +63,22 @@ namespace Treehierarchy
             }
 
             utils::CSVReader answerReader(answerCsvPath);
-            auto answers = answerReader.GetRowOfType<float>(0);
+            auto epsilon = answerReader.GetRowOfType<float>(0)[0];
+            auto answers = answerReader.GetRowOfType<float>(1);
 
             int i = 0;
-            for (auto &input : inputData) // 2000
+            auto classNum = parser.getForestClassNum();
+            std::vector<float> result(classNum, -1);
+
+            for (auto &input : inputData) 
             {
-                auto result = runner.runInference(input.data());                
-                assert(FPEqual(answers[i], result));
+                runner.runInference(input.data(), result.data());
+                if(classNum > 1) {
+                    auto a = std::distance(result.begin(), std::max_element(result.begin(), result.end()));
+                    assert(answers[i] == a);
+                } else {
+                    assert(FPEqual(answers[i], result[0], epsilon));
+                }   
                 i++;
             }
         }
@@ -88,12 +103,14 @@ namespace Treehierarchy
                 inputData.push_back(row);
             }
 
+            std::vector<float> result(parser.getForestClassNum(), -1);
+
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             for (int32_t trial = 0; trial < NUM_RUNS; trial++) // 500
             {
                 for (auto &input : inputData) // 2000
                 {
-                    runner.runInference(input.data());
+                    runner.runInference(input.data(), result.data());
                 }
             }
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -102,14 +119,12 @@ namespace Treehierarchy
             int64_t numSamples = NUM_RUNS * inputData.size();
             auto timePerSample = (double)timeTaken / (double)numSamples;
 
-            // std::cout << "sample nums: " << numSamples << " time take: " << timeTaken << "\n";
-
             return timePerSample;
         }
 
         void RunXGBoostNonOptimizeTests()
         {
-            std::puts("========================No Optimize========================\n");
+            std::puts("Running Without Optimize...\n");
             for (auto modelName : modelNames)
             {
                 auto testModelsDir = GetRepoPath() + "/data/xgb_models";
@@ -125,7 +140,7 @@ namespace Treehierarchy
 
         void RunXGBoostSwapOptimizeTests()
         {
-            std::puts("========================Swap Optimize========================\n");
+            std::puts("Running Swap Optimize...\n");
             for (auto modelName : modelNames)
             {
                 auto testModelsDir = GetRepoPath() + "/data/xgb_models";
@@ -141,7 +156,7 @@ namespace Treehierarchy
 
         void RunXGBoostFlintOptimizeTests()
         {
-            std::puts("========================Flint Optimize========================\n");
+            std::puts("Running Flint Optimize...\n");
             for (auto modelName : modelNames)
             {
                 auto testModelsDir = GetRepoPath() + "/data/xgb_models";
@@ -158,13 +173,12 @@ namespace Treehierarchy
 
         void RunXGBoostOptimizeTests()
         {
+            //TODO: Finish Optimize Test and add a RA Test
         }
- 
+
         void RunXGBoostCorrectnessTests()
         {
-            std::string testModuleNames[] = {"abalone"};
-
-            for (auto modelName : testModuleNames)
+            for (auto modelName : modelNames)
             {
                 auto testModelsDir = GetRepoPath() + "/data/xgb_models";
                 auto modelJsonPath = testModelsDir + "/" + modelName + ".json";
@@ -178,6 +192,7 @@ namespace Treehierarchy
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
 
                 verifyXGBoostResult(parser, testCsvPath, answerCsvPath);
+                std::cout << "Testing model: " << modelName << " success\n";
             }
         }
     }

@@ -66,6 +66,7 @@ namespace Treehierarchy
                 std::vector<float> vec = currentNode.node["prediction"].get<std::vector<float>>();
                 auto maxIt = std::max_element(vec.begin(), vec.end());
                 double prediction = std::distance(vec.begin(), maxIt);
+                m_forest->SetClassNum(vec.size()); // TODO: better way to get classNum?
 
                 id = m_decisionTree->NewNode(prediction, DecisionTree::LEAF_NODE_FEATURE, currentNode.prob);
             }
@@ -87,23 +88,9 @@ namespace Treehierarchy
         }
     }
 
+    // TODO: this should be finish
     void SklearnParser::CreatePredictFunction()
     {
-        func::FuncOp mainFun(getFunctionPrototype("predict"));
-        Block *callerBlock = mainFun.addEntryBlock();
-        m_builder.setInsertionPointToStart(callerBlock);
-
-        Location loc = m_builder.getUnknownLoc();
-        Value result = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
-
-        for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
-        {
-            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));
-            result = m_builder.create<arith::AddFOp>(loc, result, callResult.getResult(0));
-        }
-
-        m_builder.create<func::ReturnOp>(loc, result);
-        m_module.push_back(mainFun);
     }
 }
 

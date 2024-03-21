@@ -96,6 +96,8 @@ namespace Treehierarchy
             return m_module;
         }
 
+        size_t getForestClassNum() { return m_forest->GetClassNum(); }
+
     protected:
         BuildOptions m_option;
         json m_json;
@@ -124,7 +126,6 @@ namespace Treehierarchy
             }
             else
             {
-
                 return converter.getPointerType(m_builder.getF32Type());
             }
         }

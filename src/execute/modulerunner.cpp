@@ -9,6 +9,7 @@ namespace Treehierarchy
         ModuleRunner::ModuleRunner(mlir::ModuleOp module) : m_maybeEngine(CreateExecutionEngine(module)),
                                                             m_engine(m_maybeEngine.get()), m_module(module)
         {
+            m_inferenceFuncPtr = GetFunctionAddress("predict");
         }
 
         llvm::Expected<std::unique_ptr<mlir::ExecutionEngine>> ModuleRunner::CreateExecutionEngine(mlir::ModuleOp module)
@@ -31,19 +32,20 @@ namespace Treehierarchy
             return maybeEngine;
         }
 
-        float ModuleRunner::runInference(float *input)
+        void ModuleRunner::runInference(float *input, float *result)
         {
-            auto expectedFPtr = m_engine->lookup("predict");
-            if (expectedFPtr)
-            {
-                auto fptr = *expectedFPtr;
-                typedef float (*InferenceFunc_t)(float *);
-                auto inferenceFuncPtr = reinterpret_cast<InferenceFunc_t>(fptr);
+            typedef float (*InferenceFunc_t)(float *, float*);
+            auto inferenceFuncPtr = reinterpret_cast<InferenceFunc_t>(m_inferenceFuncPtr);
 
-                return inferenceFuncPtr(input);
-            }
+            inferenceFuncPtr(input, result);
+        }
 
-            return -1;
+        void *ModuleRunner::GetFunctionAddress(const std::string& functionName) {
+            auto expectedFptr = m_engine->lookup(functionName);
+            if (!expectedFptr)
+                return nullptr;
+            auto fptr = *expectedFptr;
+            return fptr;
         }
     }
 }
