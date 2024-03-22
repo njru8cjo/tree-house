@@ -1,9 +1,7 @@
 #include <iostream>
 #include <libgen.h>
-#include <limits>
 #include <unistd.h>
 
-#include "sklearnparser.h"
 #include "xgboostparser.h"
 #include "modulerunner.h"
 
@@ -150,7 +148,7 @@ namespace Treehierarchy
 
                 BuildOptions option;
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
-                std::cout << "time consuming: " << RunXGBoostTest(parser, testCsvPath) << "\n";
+                std::cout << modelName << " time consuming: " << RunXGBoostTest(parser, testCsvPath) << "\n";
             }
         }
 
@@ -167,13 +165,26 @@ namespace Treehierarchy
                 option.enable_flint = true;
                 XGBoostParser parser(modelJsonPath, option);
 
-                std::cout << modelName << "time consuming: " << RunXGBoostTest(parser, testCsvPath) << "\n";
+                std::cout << modelName << " time consuming: " << RunXGBoostTest(parser, testCsvPath) << "\n";
             }
         }
 
         void RunXGBoostOptimizeTests()
         {
-            //TODO: Finish Optimize Test and add a RA Test
+           std::puts("Running Optimize...");
+            for (auto modelName : modelNames)
+            {
+                auto testModelsDir = GetRepoPath() + "/data/xgb_models";
+                auto modelJsonPath = testModelsDir + "/" + modelName + ".json";
+                auto stateCsvPath = testModelsDir + "/" + modelName + ".prob.csv";
+                auto testCsvPath = testModelsDir + "/" + modelName + ".test.csv";
+
+                BuildOptions option;
+                option.enable_flint = true;
+                XGBoostParser parser(modelJsonPath, option, stateCsvPath);
+
+                std::cout << modelName << " time consuming: " << RunXGBoostTest(parser, testCsvPath) << "\n";
+            }
         }
 
         void RunXGBoostCorrectnessTests()
