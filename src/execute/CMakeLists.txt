@@ -1,3 +1,4 @@
 target_sources(frontend 
 PRIVATE 
-modulerunner.cpp)
+modulerunner.cpp
+csvreader.cpp)

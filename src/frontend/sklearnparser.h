@@ -91,6 +91,34 @@ namespace Treehierarchy
     // TODO: this should be finish
     void SklearnParser::CreatePredictFunction()
     {
+        Location loc = m_builder.getUnknownLoc();
+
+        Type argType = getFeaturePointerType();
+        auto functionType = m_builder.getFunctionType({argType, argType}, std::nullopt);
+        auto mainFun = m_builder.create<func::FuncOp>(loc, "predict", functionType);
+        mainFun.setPublic();
+
+        Block *callerBlock = mainFun.addEntryBlock();
+        m_builder.setInsertionPointToStart(callerBlock);
+
+        Value input = callerBlock->getArgument(1);
+        auto size = m_forest->GetClassNum();
+        
+        auto oneFConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(1.0));
+
+        for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
+        {
+            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));
+            Value idx = m_builder.create<arith::FPToUIOp>(loc, getI32(), callResult.getResult(0));
+
+            Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+            Value frequency = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), resultPtr);
+            mlir::Value addResult = m_builder.create<arith::AddFOp>(loc, oneFConst, frequency);
+            m_builder.create<LLVM::StoreOp>(loc, addResult, resultPtr);
+        }
+
+        m_builder.create<func::ReturnOp>(loc);
+        m_module.push_back(mainFun);
     }
 }
 

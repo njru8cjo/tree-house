@@ -1,9 +1,10 @@
 #ifndef JSON_PARSER_H
 #define JSON_PARSER_H
 
-#include "json.hpp"
-#include "decisiontree.h"
 #include <fstream>
+#include "json.hpp"
+
+#include "decisiontree.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
