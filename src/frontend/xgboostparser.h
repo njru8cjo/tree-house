@@ -3,6 +3,7 @@
 
 #include "jsonparser.h"
 #include "csvreader.h"
+#include <utility>
 
 using json = nlohmann::json;
 
@@ -59,6 +60,8 @@ namespace Treehierarchy
 
         if (m_statFilePath != "")
             ReadProbabilityProfile();
+
+        m_forest->SortFeatureProb();
     }
 
     void XGBoostParser::ConstructTree(const json treeJSON)
@@ -133,6 +136,7 @@ namespace Treehierarchy
             {
                 double prob = (double)hitCounts[i] / hitCounts[0];
                 tree->SetProbability(i, prob);
+                m_forest->SetFeatureProb(std::make_pair(tree->GetNode(i).featureIndex, prob));
             }
         }
     }
@@ -179,6 +183,23 @@ namespace Treehierarchy
             result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
         }
 
+        // If RA, load pin data to global variable
+        if(m_option.enable_ra) 
+        {
+            // Get features
+            std::vector<size_t> pin_features = m_forest->GetTopFeature();
+            size_t regNum = m_forest->GetRegNum();
+            for(size_t i = 0; i < regNum; i++)
+            {
+                // Load data
+                Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, pin_features[i], getI32());
+                Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), callerBlock->getArgument(0), featureIdx);
+                Value feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
+                // Store data
+                pin_addr[i] = m_builder.create<LLVM::AddressOfOp>(loc, pin_reg[i]);
+                m_builder.create<LLVM::StoreOp>(loc, feature, pin_addr[i]);
+            }  
+        }
         for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
         {
             auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));

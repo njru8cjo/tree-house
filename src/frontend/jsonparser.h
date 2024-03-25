@@ -28,6 +28,7 @@ namespace Treehierarchy
     public:
         bool enable_flint = false;
         bool enable_ra = false;
+        size_t regNum = 16;
     };
 
     class JsonParser
@@ -51,9 +52,28 @@ namespace Treehierarchy
 
         virtual void ConstructForest() = 0;
 
+        LLVM::GlobalOp pin_reg[32];
+        LLVM::AddressOfOp pin_addr[32];
+
         ModuleOp buildHIRModule()
         {
+            if(m_option.enable_ra) {
+                m_forest->SetRegNum(m_option.regNum);
+                // Initialize RA variables
+                auto loc = m_builder.getUnknownLoc();
+                size_t pinRegNum = m_forest->GetRegNum();
+                pinRegNum = (pinRegNum < m_forest->GetFeatureSize()) ? pinRegNum : m_forest->GetFeatureSize();
+                m_forest->SetRegNum(pinRegNum);
 
+                for(size_t i = 0; i < pinRegNum; i++)
+                {
+                    // Set global vars for pin registers
+                    pin_reg[i] = m_builder.create<LLVM::GlobalOp>(loc, getFeatureType(), /*isConstant=*/false,
+                                    LLVM::Linkage::Internal, "pin_reg_" + std::to_string(i), Attribute());
+                    m_module.push_back(pin_reg[i]);
+                }
+            }
+          
             for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
             {
                 OpBuilder::InsertPoint insertPoint = m_builder.saveInsertionPoint();
@@ -188,13 +208,23 @@ namespace Treehierarchy
             if (!node.IsLeaf())
             {
                 Value threshold = createThreshold(node.threshold);
+                Value feature;
 
-                Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
-
-                Value input = entryBlock->getArgument(0);
-
-                Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
-                Value feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
+                int nodeGlobalIdx = m_forest->GetGlobalIdxFromFeature(node.featureIndex);
+                //printf("Feature: %d, Get Idx: %d\n", node.featureIndex, nodeGlobalIdx);
+                if(m_option.enable_ra && nodeGlobalIdx >= 0)
+                {
+                    Value global_addr = m_builder.create<LLVM::AddressOfOp>(loc, pin_reg[nodeGlobalIdx]);
+                    feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), global_addr);
+                }
+                else
+                {
+                    Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
+                    Value input = entryBlock->getArgument(0);
+                    Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
+                    feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
+                }
+              
                 if (m_option.enable_flint && node.threshold < 0)
                 {
                     Value mask = m_builder.create<arith::ConstantIntOp>(loc, 0x1 << 31, getI32());
