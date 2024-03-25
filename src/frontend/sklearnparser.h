@@ -86,6 +86,14 @@ namespace Treehierarchy
 
             nodeQueue.pop();
         }
+
+        // Todo: Maybe a better way to get feature size
+        for(auto node: m_decisionTree->GetNodes()) {
+            m_forest->SetFeatureProb(std::make_pair(node.featureIndex, node.probability));
+            if(m_forest->GetFeatureSize() < node.featureIndex + 1)
+                m_forest->SetFeatureSize(node.featureIndex + 1);
+        }
+        m_forest->SortFeatureProb();  
     }
 
     // TODO: this should be finish
