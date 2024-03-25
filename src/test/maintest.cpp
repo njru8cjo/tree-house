@@ -200,6 +200,7 @@ namespace Treehierarchy
                 BuildOptions option;
                 option.enable_flint = true;
                 option.enable_ra = true;
+                option.regNum = 16;
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
 
                 verifyXGBoostResult(parser, testCsvPath, answerCsvPath);
