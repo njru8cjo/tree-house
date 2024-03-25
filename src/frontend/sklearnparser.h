@@ -101,9 +101,7 @@ namespace Treehierarchy
         Block *callerBlock = mainFun.addEntryBlock();
         m_builder.setInsertionPointToStart(callerBlock);
 
-        Value input = callerBlock->getArgument(1);
-        auto size = m_forest->GetClassNum();
-        
+        Value input = callerBlock->getArgument(1);        
         auto oneFConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(1.0));
 
         for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
@@ -112,7 +110,7 @@ namespace Treehierarchy
             Value idx = m_builder.create<arith::FPToUIOp>(loc, getI32(), callResult.getResult(0));
 
             Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
-            Value frequency = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), resultPtr);
+            Value frequency = m_builder.create<LLVM::LoadOp>(loc, getF32(), resultPtr);
             mlir::Value addResult = m_builder.create<arith::AddFOp>(loc, oneFConst, frequency);
             m_builder.create<LLVM::StoreOp>(loc, addResult, resultPtr);
         }

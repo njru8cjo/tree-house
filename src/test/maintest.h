@@ -1,4 +1,5 @@
 #include <string>
+#include "mlir/IR/BuiltinOps.h"
 
 namespace Treehierarchy
 {
@@ -9,7 +10,14 @@ namespace Treehierarchy
         void RunXGBoostFlintOptimizeTests();
         void RunXGBoostOptimizeTests();
         void RunXGBoostCorrectnessTests();
+        void DumpXGBoostLLVMIR();
 
         void RunSKlearnNonOptimizeTests();
+        void RunSKlearnSwapOptimizeTests();
+        void RunSKlearnFlintOptimizeTests();
+        void RunSKlearnOptimizeTests();
+        void DumpSKlearnLLVMIR();
+
+        void DumpLLVMIRToFile(mlir::ModuleOp module, const std::string& filename);
     }
 }

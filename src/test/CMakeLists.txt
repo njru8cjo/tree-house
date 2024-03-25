@@ -1,4 +1,6 @@
 target_sources(frontend 
 PRIVATE 
-maintest.cpp
-sklearntest.cpp)
+maincommon.cpp
+xgboosttest.cpp
+sklearntest.cpp
+)

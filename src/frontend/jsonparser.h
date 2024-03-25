@@ -26,6 +26,7 @@ namespace Treehierarchy
     class BuildOptions
     {
     public:
+        bool enable_swap = false;
         bool enable_flint = false;
         bool enable_ra = false;
     };
@@ -210,7 +211,7 @@ namespace Treehierarchy
                 int64_t leftIdx = node.leftChild;
                 int64_t rightIdx = node.rightChild;
 
-                if (leftNode.probability < rightNode.probability)
+                if (m_option.enable_swap && leftNode.probability < rightNode.probability)
                 {
                     predicate = arith::CmpFPredicate::OGE;
                     predicate2 = LLVM::ICmpPredicate::sge;
