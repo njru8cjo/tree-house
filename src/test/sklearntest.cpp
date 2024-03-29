@@ -31,8 +31,6 @@ namespace Treehierarchy
             ModuleOp module = parser.buildHIRModule();
             module = parser.lowerToLLVMModule();
 
-            // module->dump();
-
             Execute::ModuleRunner runner(module);
 
             utils::CSVReader reader(testCsvPath);
@@ -41,9 +39,9 @@ namespace Treehierarchy
             for (size_t i = 0; i < reader.GetRowNum(); i++)
             {
                 auto row = reader.GetRowOfType<float>(i);
+                row.erase(row.begin());
                 inputData.push_back(row);
             }
-
             
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
             for (int32_t trial = 0; trial < NUM_RUNS; trial++)
@@ -126,7 +124,6 @@ namespace Treehierarchy
 
                 BuildOptions option;
                 option.enable_swap = true;
-                option.enable_ra = true;
                 option.enable_flint = true;
                 SklearnParser parser(modelJsonPath, option);
 
@@ -147,7 +144,6 @@ namespace Treehierarchy
 
                 BuildOptions option;
                 option.enable_swap = true;
-                option.enable_ra = true;
                 option.enable_flint = true;
                 SklearnParser parser(modelJsonPath, option);
                 parser.ConstructForest();

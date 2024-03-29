@@ -130,6 +130,12 @@ namespace Treehierarchy
         ModuleOp m_module;
 
         virtual void CreatePredictFunction() = 0;
+        virtual void CreateLeafNode(Value result, DecisionTree::Node node) = 0;
+        virtual arith::CmpFPredicate getComparePredicate() = 0;
+        virtual arith::CmpFPredicate getReverseComparePredicate() = 0;
+        virtual LLVM::ICmpPredicate getCompareIntPredicate() = 0;
+        virtual LLVM::ICmpPredicate getReverseCompareIntPredicate() = 0;
+        virtual FunctionType getTreeFunctionType() = 0;
 
         void initMLIRContext(MLIRContext &context)
         {
@@ -148,13 +154,14 @@ namespace Treehierarchy
             }
             else
             {
-                return converter.getPointerType(m_builder.getF32Type());
+                return converter.getPointerType(getF32());
             }
         }
 
-        Type getArrayType()
+        Type getResultPointerType()
         {
-            return LLVM::LLVMArrayType::get(getF32(), m_forest->GetFeatureSize());
+            LLVMTypeConverter converter(&m_context);
+            return converter.getPointerType(getF32());
         }
 
         Type getFeatureType()
@@ -175,8 +182,7 @@ namespace Treehierarchy
         func::FuncOp getFunctionPrototype(std::string funName)
         {
             auto loc = m_builder.getUnknownLoc();
-            Type argType = getFeaturePointerType();
-            auto functionType = m_builder.getFunctionType({argType}, getF32());
+            auto functionType = getTreeFunctionType();
             auto function = m_builder.create<func::FuncOp>(loc, funName, functionType);
             function.setPublic();
 
@@ -236,15 +242,15 @@ namespace Treehierarchy
 
                 auto leftNode = tree->GetNode(node.leftChild);
                 auto rightNode = tree->GetNode(node.rightChild);
-                auto predicate = arith::CmpFPredicate::OLT;
-                auto predicate2 = LLVM::ICmpPredicate::slt;
+                auto predicate = getComparePredicate();
+                auto predicate2 = getCompareIntPredicate();
                 int64_t leftIdx = node.leftChild;
                 int64_t rightIdx = node.rightChild;
 
                 if (m_option.enable_swap && leftNode.probability < rightNode.probability)
                 {
-                    predicate = arith::CmpFPredicate::OGE;
-                    predicate2 = LLVM::ICmpPredicate::sge;
+                    predicate = getReverseComparePredicate();
+                    predicate2 = getReverseCompareIntPredicate();
                     leftIdx = node.rightChild;
                     rightIdx = node.leftChild;
                 }
@@ -278,8 +284,8 @@ namespace Treehierarchy
             }
             else
             {
-                Value result = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(node.threshold));
-                m_builder.create<func::ReturnOp>(loc, result);
+                Value result = entryBlock->getArgument(1);
+                CreateLeafNode(result, node);
             }
         }
     };

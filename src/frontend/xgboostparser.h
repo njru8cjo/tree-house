@@ -24,6 +24,19 @@ namespace Treehierarchy
         double TransformBaseScore(const PredictionTransformation objective, double val);
         PredictionTransformation GetPredictionTransformType(const std::string &objectiveName);
         void CreatePredictFunction() override;
+        void CreateLeafNode(Value result, DecisionTree::Node node) override;
+
+        arith::CmpFPredicate getComparePredicate() override { return arith::CmpFPredicate::OLT; }
+        arith::CmpFPredicate getReverseComparePredicate() override { return arith::CmpFPredicate::OGE; }
+        LLVM::ICmpPredicate getCompareIntPredicate() override { return LLVM::ICmpPredicate::slt; }
+        LLVM::ICmpPredicate getReverseCompareIntPredicate() override { return LLVM::ICmpPredicate::sge; }
+    
+        FunctionType getTreeFunctionType() override {             
+            Type argType = getFeaturePointerType();
+            Type resultType = getResultPointerType();
+            return m_builder.getFunctionType({argType, resultType}, getF32());
+        };
+
 
         std::string m_statFilePath;
     };
@@ -201,8 +214,9 @@ namespace Treehierarchy
             }  
         }
         for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
-        {
-            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));
+        {            
+            SmallVector<Value> operands = {callerBlock->getArgument(0), callerBlock->getArgument(1)};
+            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), operands);
             auto classId = m_forest->GetTree(i)->GetClassId();
             result[classId] = m_builder.create<arith::AddFOp>(loc, result[classId], callResult.getResult(0));
         }
@@ -227,6 +241,14 @@ namespace Treehierarchy
         m_builder.create<func::ReturnOp>(loc, result[0]);
         m_module.push_back(mainFun);
     }
+
+    void XGBoostParser::CreateLeafNode(Value result, DecisionTree::Node node) 
+    {
+        auto loc = m_builder.getUnknownLoc();
+        Value retVal = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(node.threshold));
+        m_builder.create<func::ReturnOp>(loc, retVal);
+    }
+
 }
 
 #endif

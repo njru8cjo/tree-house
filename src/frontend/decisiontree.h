@@ -40,6 +40,7 @@ namespace Treehierarchy
             int64_t leftChild;
             int64_t rightChild;
             double probability;
+            std::vector<float> result;
 
             bool operator==(const Node &that) const
             {
@@ -54,7 +55,7 @@ namespace Treehierarchy
 
         int64_t NewNode(double threshold, int32_t featureIndex, double probability)
         {
-            Node node{(int64_t)m_nodes.size(), threshold, featureIndex, ROOT_NODE_PARENT, EMPTY_NODE_INDEX, EMPTY_NODE_INDEX, probability};
+            Node node{(int64_t)m_nodes.size(), threshold, featureIndex, ROOT_NODE_PARENT, EMPTY_NODE_INDEX, EMPTY_NODE_INDEX, probability, {}};
             m_nodes.push_back(node);
 
             return node.id;
@@ -65,6 +66,8 @@ namespace Treehierarchy
         void SetNodeLeftChild(int64_t idx, int64_t child) { m_nodes[idx].leftChild = child; }
         void SetProbability(int64_t idx, double prob) { m_nodes[idx].probability = prob; }
         void SetClassId(size_t classId) { m_classId = classId; }
+        void SetResult(int64_t idx, std::vector<float> result) { m_nodes[idx].result = result; }
+
 
         Node GetNode(int64_t idx) { return m_nodes[idx]; }
         size_t GetClassId() { return m_classId; }
@@ -152,7 +155,7 @@ namespace Treehierarchy
     private:
         std::vector<std::shared_ptr<DecisionTree>> m_trees;
         std::vector<std::pair<unsigned, float>> m_featureProb; // First is the index, second is the probability
-        size_t m_classNum;
+        size_t m_classNum = 0;
         size_t m_featureSize;
         double m_initialValue = 0;
         PredictionTransformation m_objective;

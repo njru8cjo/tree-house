@@ -192,7 +192,7 @@ namespace Treehierarchy
 
         void RunXGBoostCorrectnessTests()
         {
-            std::puts("Dumping XGBoost Correctness Test...");
+            std::puts("XGBoost Correctness Test...");
             for (auto modelName : modelNames)
             {
                 auto testModelsDir = GetRepoPath() + "/data/xgb_models";
@@ -226,7 +226,6 @@ namespace Treehierarchy
                 BuildOptions option;
                 option.enable_swap = true;
                 option.enable_flint = true;
-                option.enable_ra = true;
 
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
                 parser.ConstructForest();

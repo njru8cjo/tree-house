@@ -18,8 +18,21 @@ namespace Treehierarchy
         void ConstructForest() override;
         void ConstructTree(const json treeJSON);
 
-    private:
+    protected:
         void CreatePredictFunction() override;
+        void CreateLeafNode(Value result, DecisionTree::Node node) override;
+
+        arith::CmpFPredicate getComparePredicate() override { return arith::CmpFPredicate::OLE; }
+        arith::CmpFPredicate getReverseComparePredicate() override { return arith::CmpFPredicate::OGT; }
+        LLVM::ICmpPredicate getCompareIntPredicate() override { return LLVM::ICmpPredicate::sle; }
+        LLVM::ICmpPredicate getReverseCompareIntPredicate() override { return LLVM::ICmpPredicate::sgt; }
+
+        FunctionType getTreeFunctionType() override {             
+            Type argType = getFeaturePointerType();
+            Type resultType = getResultPointerType();
+            return m_builder.getFunctionType({argType, resultType}, std::nullopt);
+        };
+
         struct Node
         {
             json node;
@@ -64,11 +77,9 @@ namespace Treehierarchy
             else
             {
                 std::vector<float> vec = currentNode.node["prediction"].get<std::vector<float>>();
-                auto maxIt = std::max_element(vec.begin(), vec.end());
-                double prediction = std::distance(vec.begin(), maxIt);
-                m_forest->SetClassNum(vec.size()); // TODO: better way to get classNum?
-
-                id = m_decisionTree->NewNode(prediction, DecisionTree::LEAF_NODE_FEATURE, currentNode.prob);
+                id = m_decisionTree->NewNode(-1.0, DecisionTree::LEAF_NODE_FEATURE, currentNode.prob);
+                m_forest->SetClassNum(vec.size());
+                m_decisionTree->SetResult(id, vec);
             }
 
             int64_t parentId = currentNode.parent;
@@ -96,7 +107,6 @@ namespace Treehierarchy
         m_forest->SortFeatureProb();  
     }
 
-    // TODO: this should be finish
     void SklearnParser::CreatePredictFunction()
     {
         Location loc = m_builder.getUnknownLoc();
@@ -109,23 +119,33 @@ namespace Treehierarchy
         Block *callerBlock = mainFun.addEntryBlock();
         m_builder.setInsertionPointToStart(callerBlock);
 
-        Value input = callerBlock->getArgument(1);        
-        auto oneFConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(1.0));
-
         for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
         {
-            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), callerBlock->getArgument(0));
-            Value idx = m_builder.create<arith::FPToUIOp>(loc, getI32(), callResult.getResult(0));
-
-            Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
-            Value frequency = m_builder.create<LLVM::LoadOp>(loc, getF32(), resultPtr);
-            mlir::Value addResult = m_builder.create<arith::AddFOp>(loc, oneFConst, frequency);
-            m_builder.create<LLVM::StoreOp>(loc, addResult, resultPtr);
+            SmallVector<Value> operands = {callerBlock->getArgument(0), callerBlock->getArgument(1)};
+            m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), operands);
         }
 
         m_builder.create<func::ReturnOp>(loc);
         m_module.push_back(mainFun);
     }
+
+    void SklearnParser::CreateLeafNode(Value result, DecisionTree::Node node) 
+    {
+        auto loc = m_builder.getUnknownLoc();      
+        for (size_t i = 0; i < node.result.size(); i++)
+        {
+            if(node.result[i] != 0.0) {
+                Value resultIdx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
+                Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getResultPointerType(), getF32(), result, resultIdx);
+                Value loadVal = m_builder.create<LLVM::LoadOp>(loc, getF32(), resultPtr);
+                Value resultVal = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(node.result[i]));
+                Value addResult = m_builder.create<arith::AddFOp>(loc, resultVal, loadVal);
+                m_builder.create<LLVM::StoreOp>(loc, addResult, resultPtr);
+            }
+        }
+        m_builder.create<func::ReturnOp>(loc);
+    }
 }
+
 
 #endif
