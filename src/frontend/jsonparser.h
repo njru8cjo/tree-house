@@ -53,8 +53,8 @@ namespace Treehierarchy
 
         virtual void ConstructForest() = 0;
 
-        LLVM::GlobalOp pin_reg[32];
-        LLVM::AddressOfOp pin_addr[32];
+        LLVM::LoadOp pin_reg[32];
+        std::vector<Block*> leafBlock;
 
         ModuleOp buildHIRModule()
         {
@@ -66,29 +66,26 @@ namespace Treehierarchy
                 pinRegNum = (pinRegNum < m_forest->GetFeatureSize()) ? pinRegNum : m_forest->GetFeatureSize();
                 m_forest->SetRegNum(pinRegNum);
 
-                for(size_t i = 0; i < pinRegNum; i++)
+            }
+
+            if(!m_option.enable_ra) // If not ra, create function here
+            {
+                for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
                 {
-                    // Set global vars for pin registers
-                    pin_reg[i] = m_builder.create<LLVM::GlobalOp>(loc, getFeatureType(), /*isConstant=*/false,
-                                    LLVM::Linkage::Internal, "pin_reg_" + std::to_string(i), Attribute());
-                    m_module.push_back(pin_reg[i]);
+                    OpBuilder::InsertPoint insertPoint = m_builder.saveInsertionPoint();
+
+                    func::FuncOp function(getFunctionPrototype("tree_" + std::to_string(i)));
+
+                    Block *entryBlock = function.addEntryBlock();
+                    DecisionTree *tree = m_forest->GetTree(i);
+                    m_builder.setInsertionPointToStart(entryBlock);
+                    buildNodeOp(entryBlock, tree, 0);
+                    m_module.push_back(function);
+
+                    m_builder.restoreInsertionPoint(insertPoint);
                 }
             }
-          
-            for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
-            {
-                OpBuilder::InsertPoint insertPoint = m_builder.saveInsertionPoint();
-
-                func::FuncOp function(getFunctionPrototype("tree_" + std::to_string(i)));
-
-                Block *entryBlock = function.addEntryBlock();
-                DecisionTree *tree = m_forest->GetTree(i);
-                m_builder.setInsertionPointToStart(entryBlock);
-                buildNodeOp(entryBlock, tree, 0);
-                m_module.push_back(function);
-
-                m_builder.restoreInsertionPoint(insertPoint);
-            }
+            
 
             CreatePredictFunction();
 
@@ -218,19 +215,10 @@ namespace Treehierarchy
                 Value feature;
 
                 int nodeGlobalIdx = m_forest->GetGlobalIdxFromFeature(node.featureIndex);
-                //printf("Feature: %d, Get Idx: %d\n", node.featureIndex, nodeGlobalIdx);
-                if(m_option.enable_ra && nodeGlobalIdx >= 0)
-                {
-                    Value global_addr = m_builder.create<LLVM::AddressOfOp>(loc, pin_reg[nodeGlobalIdx]);
-                    feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), global_addr);
-                }
-                else
-                {
                     Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
                     Value input = entryBlock->getArgument(0);
                     Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
                     feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
-                }
               
                 if (m_option.enable_flint && node.threshold < 0)
                 {
@@ -286,6 +274,91 @@ namespace Treehierarchy
             {
                 Value result = entryBlock->getArgument(1);
                 CreateLeafNode(result, node);
+            }
+        }
+
+        void buildRANodeOp(Block *entryBlock, DecisionTree *tree, int idx, Value resultClass)
+        {
+            DecisionTree::Node node = tree->GetNode(idx);
+            auto loc = m_builder.getUnknownLoc();
+
+            if (!node.IsLeaf())
+            {
+                Value threshold = createThreshold(node.threshold);
+                Value feature;
+
+                int nodeGlobalIdx = m_forest->GetGlobalIdxFromFeature(node.featureIndex);
+                //printf("Feature: %d, Get Idx: %d\n", node.featureIndex, nodeGlobalIdx);
+                if(m_option.enable_ra && nodeGlobalIdx >= 0)
+                {
+                    feature = pin_reg[nodeGlobalIdx];
+                }
+                else
+                {
+                    Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
+                    Value input = entryBlock->getArgument(0);
+                    Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
+                    feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
+                }
+              
+                if (m_option.enable_flint && node.threshold < 0)
+                {
+                    Value mask = m_builder.create<arith::ConstantIntOp>(loc, 0x1 << 31, getI32());
+                    feature = m_builder.create<mlir::arith::XOrIOp>(loc, feature, mask);
+                }
+
+                OpBuilder::InsertPoint insertPoint = m_builder.saveInsertionPoint();
+
+                auto leftNode = tree->GetNode(node.leftChild);
+                auto rightNode = tree->GetNode(node.rightChild);
+                auto predicate = getComparePredicate();
+                auto predicate2 = getCompareIntPredicate();
+                int64_t leftIdx = node.leftChild;
+                int64_t rightIdx = node.rightChild;
+
+                if (m_option.enable_swap && leftNode.probability < rightNode.probability)
+                {
+                    predicate = getReverseComparePredicate();
+                    predicate2 = getReverseCompareIntPredicate();
+                    leftIdx = node.rightChild;
+                    rightIdx = node.leftChild;
+                }
+
+                Value condition;
+                if (m_option.enable_flint && node.threshold < 0)
+                {
+                    condition = m_builder.create<LLVM::ICmpOp>(loc, predicate2, threshold, feature);
+                }
+                else if (m_option.enable_flint)
+                {
+                    condition = m_builder.create<LLVM::ICmpOp>(loc, predicate2, feature, threshold);
+                }
+                else
+                {
+                    condition = m_builder.create<arith::CmpFOp>(loc, predicate, feature, threshold);
+                }
+
+                Region *funcBody = entryBlock->getParent();
+                Block *tBlock = m_builder.createBlock(funcBody);
+                m_builder.setInsertionPointToStart(tBlock);
+                buildRANodeOp(entryBlock, tree, leftIdx, resultClass);
+
+                Block *fBlock = m_builder.createBlock(funcBody);
+                m_builder.setInsertionPointToStart(fBlock);
+                buildRANodeOp(entryBlock, tree, rightIdx, resultClass);
+
+                m_builder.restoreInsertionPoint(insertPoint);
+                ValueRange nullList = {};
+                m_builder.create<LLVM::CondBrOp>(loc, condition, tBlock, nullList, fBlock, nullList);
+            }
+            else
+            {
+                auto loc = m_builder.getUnknownLoc();
+                Value retVal = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(node.threshold));
+                Value input = m_builder.create<LLVM::LoadOp>(loc, getF32(), resultClass);
+                Value res= m_builder.create<arith::AddFOp>(loc, input, retVal);
+                m_builder.create<LLVM::StoreOp>(loc, res, resultClass);
+                leafBlock.push_back(m_builder.getBlock());
             }
         }
     };

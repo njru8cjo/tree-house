@@ -42,7 +42,7 @@ bool DumpLLVMIRIfNeeded(int argc, char *argv[]) {
     for (int32_t i = 0; i < argc; i++)
         if (std::string(argv[i]).find(std::string("--dump")) != std::string::npos) {
             test::DumpXGBoostLLVMIR();        
-            test::DumpSKlearnLLVMIR();
+            //test::DumpSKlearnLLVMIR();
             return true;
         }
     return false;

@@ -191,10 +191,6 @@ namespace Treehierarchy
 
         Value input = callerBlock->getArgument(1);
         Value result[m_forest->GetClassNum()];
-        for (size_t i = 0; i < m_forest->GetClassNum(); i++)
-        {
-            result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
-        }
 
         // If RA, load pin data to global variable
         if(m_option.enable_ra) 
@@ -207,37 +203,84 @@ namespace Treehierarchy
                 // Load data
                 Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, pin_features[i], getI32());
                 Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), callerBlock->getArgument(0), featureIdx);
-                Value feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
-                // Store data
-                pin_addr[i] = m_builder.create<LLVM::AddressOfOp>(loc, pin_reg[i]);
-                m_builder.create<LLVM::StoreOp>(loc, feature, pin_addr[i]);
+                pin_reg[i] = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
             }  
-        }
-        for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
-        {            
-            SmallVector<Value> operands = {callerBlock->getArgument(0), callerBlock->getArgument(1)};
-            auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), operands);
-            auto classId = m_forest->GetTree(i)->GetClassId();
-            result[classId] = m_builder.create<arith::AddFOp>(loc, result[classId], callResult.getResult(0));
-        }
-
-        for (size_t i = 0; i < m_forest->GetClassNum(); i++)
-        {
-
-            if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
+            Block *curBlock = m_builder.getBlock();
+            for (size_t i = 0; i < m_forest->GetClassNum(); i++)
             {
-                auto negate = m_builder.create<arith::NegFOp>(loc, getF32(), result[i]);
-                auto exponential = m_builder.create<math::ExpOp>(loc, getF32(), static_cast<Value>(negate));
-                auto oneConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr((float)1.0));
-                auto onePlusExp = m_builder.create<arith::AddFOp>(loc, getF32(), oneConst, exponential);
-                result[i] = m_builder.create<arith::DivFOp>(loc, getF32(), oneConst, onePlusExp);
+                auto zeroConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
+                Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
+                Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+                m_builder.create<LLVM::StoreOp>(loc, zeroConst, resultPtr);
             }
+            for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
+            {
+                // Get tree
+                DecisionTree *tree = m_forest->GetTree(i);
+                // Get result class
+                auto classId = m_forest->GetTree(i)->GetClassId();
+                Value idx = m_builder.create<arith::ConstantIntOp>(loc, classId, getI32());
+                Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+                buildRANodeOp(curBlock, tree, 0, resultPtr);
+                // Coacate next root to previous leaf
+                Block *nextBlock = m_builder.createBlock(&mainFun.getBody());
+                for(Block* lb: leafBlock)
+                {
+                    m_builder.setInsertionPointToEnd(lb);
+                    m_builder.create<LLVM::BrOp>(loc, nextBlock);
+                }
+                leafBlock.clear();
+                m_builder.setInsertionPointToStart(nextBlock);
+            }
+            for (size_t i = 0; i < m_forest->GetClassNum(); i++)
+            {
+                for (size_t i = 0; i < m_forest->GetClassNum(); i++)
+                {
+                    result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
+                }
+                if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
+                {
+                    Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
+                    Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+                    Value loadData = m_builder.create<LLVM::LoadOp>(loc, getF32(), resultPtr);
+                    auto negate = m_builder.create<arith::NegFOp>(loc, getF32(), loadData);
+                    auto exponential = m_builder.create<math::ExpOp>(loc, getF32(), static_cast<Value>(negate));
+                    auto oneConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr((float)1.0));
+                    auto onePlusExp = m_builder.create<arith::AddFOp>(loc, getF32(), oneConst, exponential);
+                    auto divRes = m_builder.create<arith::DivFOp>(loc, getF32(), oneConst, onePlusExp);
+                    m_builder.create<LLVM::StoreOp>(loc, divRes, resultPtr);
+                }
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
+            {            
+                SmallVector<Value> operands = {callerBlock->getArgument(0), callerBlock->getArgument(1)};
+                auto callResult = m_builder.create<func::CallOp>(loc, StringRef("tree_" + std::to_string(i)), getF32(), operands);
+                auto classId = m_forest->GetTree(i)->GetClassId();
+                result[classId] = m_builder.create<arith::AddFOp>(loc, result[classId], callResult.getResult(0));
+            }
+            for (size_t i = 0; i < m_forest->GetClassNum(); i++)
+            {
 
-            Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
-            Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
-            m_builder.create<LLVM::StoreOp>(loc, result[i], resultPtr);
+                if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
+                {
+                    auto negate = m_builder.create<arith::NegFOp>(loc, getF32(), result[i]);
+                    auto exponential = m_builder.create<math::ExpOp>(loc, getF32(), static_cast<Value>(negate));
+                    auto oneConst = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr((float)1.0));
+                    auto onePlusExp = m_builder.create<arith::AddFOp>(loc, getF32(), oneConst, exponential);
+                    result[i] = m_builder.create<arith::DivFOp>(loc, getF32(), oneConst, onePlusExp);
+                }
+
+                Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
+                Value resultPtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getF32(), input, idx);
+                m_builder.create<LLVM::StoreOp>(loc, result[i], resultPtr);
+            }
         }
 
+        
+        
         m_builder.create<func::ReturnOp>(loc, result[0]);
         m_module.push_back(mainFun);
     }
