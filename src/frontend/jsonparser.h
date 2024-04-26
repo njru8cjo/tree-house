@@ -61,7 +61,6 @@ namespace Treehierarchy
             if(m_option.enable_ra) {
                 m_forest->SetRegNum(m_option.regNum);
                 // Initialize RA variables
-                auto loc = m_builder.getUnknownLoc();
                 size_t pinRegNum = m_forest->GetRegNum();
                 pinRegNum = (pinRegNum < m_forest->GetFeatureSize()) ? pinRegNum : m_forest->GetFeatureSize();
                 m_forest->SetRegNum(pinRegNum);
@@ -213,12 +212,10 @@ namespace Treehierarchy
             {
                 Value threshold = createThreshold(node.threshold);
                 Value feature;
-
-                int nodeGlobalIdx = m_forest->GetGlobalIdxFromFeature(node.featureIndex);
-                    Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
-                    Value input = entryBlock->getArgument(0);
-                    Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
-                    feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
+                Value featureIdx = m_builder.create<arith::ConstantIntOp>(loc, node.featureIndex, getI32());
+                Value input = entryBlock->getArgument(0);
+                Value featurePtr = m_builder.create<LLVM::GEPOp>(loc, getFeaturePointerType(), getFeatureType(), input, featureIdx);
+                feature = m_builder.create<LLVM::LoadOp>(loc, getFeatureType(), featurePtr);
               
                 if (m_option.enable_flint && node.threshold < 0)
                 {

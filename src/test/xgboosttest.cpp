@@ -12,8 +12,8 @@ namespace Treehierarchy
 {
     namespace test
     {    
-        //const std::string modelNames[] = {"abalone", "airline", "airline-ohe", "covtype", "epsilon", "letters", "higgs", "year_prediction_msd"};
-        const std::string modelNames[] = {"abalone"};
+        // const std::string modelNames[] = {"abalone", "airline", "airline-ohe", "covtype", "epsilon", "letters", "higgs", "year_prediction_msd"};
+        const std::string modelNames[] = {"abalone", "airline", "airline-ohe", "covtype", "epsilon", "higgs", "year_prediction_msd"};
         const int32_t NUM_RUNS = 500;
 
         inline bool FPEqual(float a, float b, float epsilon)
@@ -48,7 +48,7 @@ namespace Treehierarchy
             ModuleOp module = parser.buildHIRModule();
             module = parser.lowerToLLVMModule();
 
-            module->dump();
+            // module->dump();
 
             Execute::ModuleRunner runner(module);
 
@@ -203,10 +203,10 @@ namespace Treehierarchy
                 auto answerCsvPath = testModelsDir + "/" + modelName + ".answer.csv";
 
                 BuildOptions option;
-                option.enable_swap = true;
-                option.enable_flint = true;
-                option.enable_ra = true;
-                option.regNum = 16;
+                option.enable_swap = false;
+                option.enable_flint = false;
+                option.enable_ra = false;
+                option.regNum = 32;
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
 
                 verifyXGBoostResult(parser, testCsvPath, answerCsvPath);
@@ -227,7 +227,8 @@ namespace Treehierarchy
                 BuildOptions option;
                 option.enable_swap = false;
                 option.enable_flint = false;
-                option.enable_ra = true;
+                option.enable_ra = false;
+                option.regNum = 32;
 
                 XGBoostParser parser(modelJsonPath, option, stateCsvPath);
                 parser.ConstructForest();

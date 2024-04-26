@@ -182,7 +182,7 @@ namespace Treehierarchy
         Location loc = m_builder.getUnknownLoc();
 
         Type argType = getFeaturePointerType();
-        auto functionType = m_builder.getFunctionType({argType, argType}, getF32());
+        auto functionType = m_builder.getFunctionType({argType, argType}, {});
         auto mainFun = m_builder.create<func::FuncOp>(loc, "predict", functionType);
         mainFun.setPublic();
 
@@ -190,9 +190,7 @@ namespace Treehierarchy
         m_builder.setInsertionPointToStart(callerBlock);
 
         Value input = callerBlock->getArgument(1);
-        Value result[m_forest->GetClassNum()];
 
-        // If RA, load pin data to global variable
         if(m_option.enable_ra) 
         {
             // Get features
@@ -234,10 +232,6 @@ namespace Treehierarchy
             }
             for (size_t i = 0; i < m_forest->GetClassNum(); i++)
             {
-                for (size_t i = 0; i < m_forest->GetClassNum(); i++)
-                {
-                    result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
-                }
                 if (m_forest->GetObjective() == PredictionTransformation::kSigmoid)
                 {
                     Value idx = m_builder.create<arith::ConstantIntOp>(loc, i, getI32());
@@ -254,6 +248,11 @@ namespace Treehierarchy
         }
         else
         {
+            Value result[m_forest->GetClassNum()];
+            for (size_t i = 0; i < m_forest->GetClassNum(); i++)
+            {
+                result[i] = m_builder.create<arith::ConstantOp>(loc, getF32(), m_builder.getF32FloatAttr(m_forest->GetInitialValue()));
+            }
             for (size_t i = 0; i < m_forest->GetTreeSize(); i++)
             {            
                 SmallVector<Value> operands = {callerBlock->getArgument(0), callerBlock->getArgument(1)};
@@ -280,8 +279,7 @@ namespace Treehierarchy
         }
 
         
-        
-        m_builder.create<func::ReturnOp>(loc, result[0]);
+        m_builder.create<func::ReturnOp>(loc);
         m_module.push_back(mainFun);
     }
 
