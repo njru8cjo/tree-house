@@ -16,6 +16,7 @@ namespace Treehierarchy
         void RunSKlearnSwapOptimizeTests();
         void RunSKlearnFlintOptimizeTests();
         void RunSKlearnOptimizeTests();
+        void RunSKlearnCorrectnessTests();
         void DumpSKlearnLLVMIR();
 
         void DumpLLVMIRToFile(mlir::ModuleOp module, const std::string& filename);
