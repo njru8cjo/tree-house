@@ -1,4 +1,3 @@
-#include <iostream>
 #include <libgen.h>
 #include <unistd.h>
 
@@ -14,19 +13,6 @@ namespace Treehierarchy
     {    
         const std::string modelNames[] = {"abalone", "airline", "airline-ohe", "covtype", "epsilon", "letters", "higgs", "year_prediction_msd"};
         const int32_t NUM_RUNS = 500;
-
-        inline bool FPEqual(float a, float b, float epsilon)
-        {
-            bool ret = std::abs(a - b) < epsilon;
-
-            if (!ret) {
-                std::cout << a << " != " << b << std::endl;
-                std::cout << (a - b) << std::endl;
-                std::cout << "x in hex: " << std::hexfloat << a << std::endl;
-                std::cout << "y in hex: " << std::hexfloat << b << std::endl;
-            }
-            return ret;
-        }
 
         static std::string GetRepoPath()
         {

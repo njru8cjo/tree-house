@@ -1,5 +1,6 @@
 #include <libgen.h>
 #include <unistd.h>
+#include <iomanip>
 
 #include "csvreader.h"
 #include "maintest.h"
@@ -10,8 +11,7 @@ namespace Treehierarchy
 {
     namespace test
     {
-        // const std::string modelNames[] = {"adult", "bank", "letter", "magic", "satlog", "spambase", "wine-quality", "sensorless"};
-        const std::string modelNames[] = {"wine-quality"};
+        const std::string modelNames[] = {"adult", "bank", "letter", "magic", "satlog", "spambase", "wine-quality", "sensorless"};
         const int32_t NUM_RUNS = 10000;
 
         static std::string GetRepoPath()
@@ -24,19 +24,6 @@ namespace Treehierarchy
             char *buildDir = dirname(execDir);
             char *repoPath = dirname(buildDir);
             return repoPath;
-        }
-
-        inline bool FPEqual(float a, float b, float epsilon)
-        {
-            bool ret = std::abs(a - b) < epsilon;
-
-            if (!ret) {
-                std::cout << a << " != " << b << std::endl;
-                std::cout << (a - b) << std::endl;
-                std::cout << "x in hex: " << std::hexfloat << a << std::endl;
-                std::cout << "y in hex: " << std::hexfloat << b << std::endl;
-            }
-            return ret;
         }
 
         static double RunSklearnTest(JsonParser &parser, std::string testCsvPath) {
@@ -103,11 +90,7 @@ namespace Treehierarchy
                 std::vector<float> answer = answerReader.GetRowOfType<float>(i+1);
                 runner.runInference(input.data(), result.data());
                 for(size_t x = 0; x < classNum; x++) {
-                    // std::cout << result[x] << " ";
-                    if(!FPEqual(answer[x], result[x], epsilon)) {
-                        std::cout << "wrong" << i << "\n";
-                        break;
-                    }
+                   assert(FPEqual(answer[x], result[x], epsilon));
                 }
             }
         }

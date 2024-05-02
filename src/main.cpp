@@ -33,6 +33,7 @@ bool RunCorrectnessTestIfNeeded(int argc, char *argv[]) {
     for (int32_t i = 0; i < argc; i++)
         if (std::string(argv[i]).find(std::string("--correctness")) != std::string::npos) {
             test::RunXGBoostCorrectnessTests();
+            test::RunSKlearnCorrectnessTests();
             return true;
         }
     return false;
