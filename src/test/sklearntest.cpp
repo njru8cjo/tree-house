@@ -1,5 +1,6 @@
 #include <libgen.h>
 #include <unistd.h>
+#include <iomanip>
 
 #include "csvreader.h"
 #include "maintest.h"
@@ -10,7 +11,7 @@ namespace Treehierarchy
 {
     namespace test
     {
-        const std::string modelNames[] = {"adult", "bank", "letter", "magic", "satlog", "sensorless", "spambase", "wine-quality"};
+        const std::string modelNames[] = {"adult", "bank", "letter", "magic", "satlog", "spambase", "wine-quality", "sensorless"};
         const int32_t NUM_RUNS = 10000;
 
         static std::string GetRepoPath()
@@ -58,6 +59,40 @@ namespace Treehierarchy
             int64_t numSamples = NUM_RUNS * inputData.size();
             auto timePerSample = (double)timeTaken / (double)numSamples;
             return timePerSample;
+        }
+
+        static void verifySKlearnResult(JsonParser &parser, std::string testCsvPath, std::string answerCsvPath)
+        {
+            parser.ConstructForest();
+            ModuleOp module = parser.buildHIRModule();
+            // module->dump();
+            module = parser.lowerToLLVMModule();
+
+            Execute::ModuleRunner runner(module);
+
+            utils::CSVReader testCaseReader(testCsvPath);
+            std::vector<std::vector<float>> inputData;
+
+            for (size_t i = 0; i < testCaseReader.GetRowNum(); i++)
+            {
+                auto row = testCaseReader.GetRowOfType<float>(i);
+                row.erase(row.begin());
+                inputData.push_back(row);
+            }
+
+            utils::CSVReader answerReader(answerCsvPath);
+            auto epsilon = answerReader.GetRowOfType<float>(0)[0];
+            auto classNum = parser.getForestClassNum();
+
+            for(size_t i = 0; i < inputData.size(); i++) {
+                std::vector<float> input = inputData[i];
+                std::vector<float> result(classNum, 0);
+                std::vector<float> answer = answerReader.GetRowOfType<float>(i+1);
+                runner.runInference(input.data(), result.data());
+                for(size_t x = 0; x < classNum; x++) {
+                   assert(FPEqual(answer[x], result[x], epsilon));
+                }
+            }
         }
 
         void RunSKlearnNonOptimizeTests()
@@ -131,6 +166,26 @@ namespace Treehierarchy
                 std::cout << modelName << " time consuming: " << time << "\n";
             }
             std::cout << std::endl;
+        }
+
+        void RunSKlearnCorrectnessTests()
+        {
+            std::puts("SKlearn Correctness Test...");
+            for (auto modelName : modelNames)
+            {
+                auto testModelsDir = GetRepoPath() + "/data/sklearn_models";
+                auto modelJsonPath = testModelsDir + "/" + modelName + ".json";
+                auto testCsvPath = testModelsDir + "/" + modelName + ".test.csv";
+                auto answerCsvPath = testModelsDir + "/" + modelName + ".answer.csv";
+
+                BuildOptions option;
+                // option.enable_swap = true;
+                // option.enable_flint = true;
+                SklearnParser parser(modelJsonPath, option);
+
+                verifySKlearnResult(parser, testCsvPath, answerCsvPath);
+                std::cout << "Testing model: " << modelName << " success\n";
+            }
         }
 
         void DumpSKlearnLLVMIR()
