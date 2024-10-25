@@ -11,3 +11,6 @@ cmake --build .
 ```bash
 ./build/bin/frontend --dump
 ```
+
+## Pre-request
+MLIR build with llvm-project 18.0.1
